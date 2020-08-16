@@ -1,0 +1,87 @@
+---
+title: "Estimating LULCC Transitions"
+author: "Benson Kenduiywo"
+date: "13/08/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+Load necessary libraries. 
+
+```{r libs, message=FALSE}
+rm(list=ls(all=TRUE))	#Clears R memory
+unlink(".RData") 
+library(raster)
+library(lulcc)
+library(dplyr)
+library(kableExtra)
+library(knitr)
+```
+
+
+## Data
+
+Read necessary data (classified images and boundary vector). 
+
+```{r r1, echo=FALSE}
+path <-  paste0(getwd(),"/Benthic_rasters/")
+f <- list.files(path, pattern = glob2rx("*Kisite*.tif$"), full.names = TRUE)
+kisite <- shapefile(paste0(getwd(),"/MPAs/Kisite-Mpunguti.shp"))
+#r <- do.call(brick, lapply(f, raster))
+r <- lapply(f, raster)
+```
+
+Clip rasters to exact boundary outline.
+
+```{r r3}
+kisite <- spTransform(kisite, crs(r[[1]]))
+r <- lapply(r, mask,kisite)
+```
+
+Stack the rasters together.
+
+```{r 3a}
+r <- stack(r)
+```
+
+Rename layer names of the rasters.
+
+```{r r2}
+names(r) <- gsub("_Kisite_Benthic_Map", "", names(r))
+names(r) <- gsub("X","Year_",names(r))
+
+```
+
+
+Display the classifications.
+
+```{r r4}
+x11()
+plot(r[[1]], main="2003")
+plot(kisite,add=TRUE)
+```
+
+Landcover transitions.
+
+```{r}
+library(lulcc)
+obs <- ObsLulcRasterStack(
+  r[[1:6]],
+  categories=c(0,1,2,3), 
+  labels=c("Corals","Seagrass","Sand","Water"),                
+  t=c(0,3,6,9,12,15)
+  )
+
+lc_kisite <- crossTabulate(obs, times=c(0,15))
+lc_kisite <- (lc_kisite*900)/0.0001
+write.csv(lc_kisite,"Kisite_2003_2018.csv")
+knitr::kable(lc_kisite, caption="Land-cover transitions between 2003 and 2018 in Kisite.") %>%
+  kable_styling(latex_options = c("striped", "hold_position"),
+                full_width = T)
+```
+
